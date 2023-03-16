@@ -1,8 +1,13 @@
-const logoutButton = new LogoutButton;
+const logoutButton = new LogoutButton();
+const ratesBoard = new RatesBoard();
+const moneyManager = new MoneyManager();
+const favoritesWidget = new FavoritesWidget();
+
 logoutButton.action = () => {
 	ApiConnector.logout(response => {
 		// возвращает объект {success}
 		if (response.success) {
+			clearInterval(interval);
 			location.reload();
 		}
 	});  
@@ -12,23 +17,25 @@ ApiConnector.current(response => {
 	// возвращает объект {success: true, data: {данные профиля}}
 	if (response.success) {
 		ProfileWidget.showProfile(response.data);
+	} else {
+		favoritesWidget.setMessage(false, "Ошибка загрузки данных профиля!");
 	}
 });
- 
-const ratesBoard = new RatesBoard;
+
 function getCurrencyExchangeRates() {
 	ApiConnector.getStocks(response => {
 		// возвращает объект {success: true, data: {данные курсов валют}}
 		if (response.success) {
 			ratesBoard.clearTable();
 			ratesBoard.fillTable(response.data);
+		} else {
+			favoritesWidget.setMessage(false, "Ошибка загрузки курсов валют!");
 		}
 	});
 }
 getCurrencyExchangeRates();
-setInterval(getCurrencyExchangeRates, 60000);
+let interval = setInterval(getCurrencyExchangeRates, 60000);
 
-const moneyManager = new MoneyManager;
 moneyManager.addMoneyCallback = data => {
 	// data - это пользовательский ввод { currency, amount}
 	ApiConnector.addMoney(data, response => {
@@ -68,13 +75,18 @@ moneyManager.sendMoneyCallback = data => {
 	});	
 }
 
-const favoritesWidget = new FavoritesWidget;
+function updateFavorites(data) {
+	favoritesWidget.clearTable();
+	favoritesWidget.fillTable(data);
+	moneyManager.updateUsersList(data);
+}
+
 ApiConnector.getFavorites(response => {
 	// возвращает объект {success: true, data: {список избранных}}
 	if (response.success) {
-		favoritesWidget.clearTable();
-		favoritesWidget.fillTable(response.data);
-		moneyManager.updateUsersList(response.data);
+		updateFavorites(response.data);
+	} else {
+		favoritesWidget.setMessage(false, "Ошибка загрузки избранного!");
 	}
 });
 
@@ -83,9 +95,7 @@ favoritesWidget.addUserCallback = (data) => {
 	ApiConnector.addUserToFavorites(data, response => {
 		// возвращает объект {success, data: {обновлённый список избранных} или error}
 		if (response.success) {
-			favoritesWidget.clearTable();
-			favoritesWidget.fillTable(response.data);
-			moneyManager.updateUsersList(response.data);
+			updateFavorites(response.data);
 			favoritesWidget.setMessage(response.success, "Пользователь добавлен в избранные!");
 		} else {
 			favoritesWidget.setMessage(response.success, response.error);
@@ -97,9 +107,7 @@ favoritesWidget.removeUserCallback = (userId) => {
 	ApiConnector.removeUserFromFavorites(userId, response => {
 		// возвращает объект {success: true, data: {обновлённый список избранных}}
 		if (response.success) {
-			favoritesWidget.clearTable();
-			favoritesWidget.fillTable(response.data);
-			moneyManager.updateUsersList(response.data);
+			updateFavorites(response.data);
 			favoritesWidget.setMessage(response.success, "Пользователь удалён из избранных!");
 		} else {
 			favoritesWidget.setMessage(response.success, response.error);
